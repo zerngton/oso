@@ -91,8 +91,7 @@ p{margin:0}
 .facts{margin:6px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px 24px;font-size:15px;line-height:1.45}
 .facts dt,.label{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
 .facts dd{margin:2px 0 0}
-.photo{aspect-ratio:4/5;border-radius:20px;background:repeating-linear-gradient(135deg,#1F1D1B 0 14px,#252220 14px 28px);border:1px solid #3A3631;display:flex;align-items:flex-end;padding:20px}
-.photo span{font-size:13px;color:var(--faint);background:var(--ink);padding:6px 10px;border-radius:6px}
+.photo{width:100%;height:auto;aspect-ratio:4/5;border-radius:20px;border:1px solid #3A3631}
 
 .stripe{height:14px;background:repeating-linear-gradient(-45deg,var(--accent) 0 12px,var(--ink) 12px 24px,var(--paper) 24px 36px,var(--ink) 36px 48px)}
 
@@ -207,9 +206,44 @@ body{padding-bottom:72px}
         <div><dt>Call</dt><dd><a data-tel data-phone-local href="tel:+447386024758">07386 024758</a></dd></div>
       </dl>
     </div>
-    <div class="photo" role="img" aria-label="Image placeholder: a properly licensed photo of a barber at work would go here">
-      <span>Licensed stock photo placeholder</span>
-    </div>
+    <!-- Illustration; swap for a licensed photo: <img src="hero.jpg" alt="..."> -->
+    <svg class="photo" viewBox="0 0 400 500" role="img" aria-label="Illustration of a barbershop interior with a barber chair, a mirror and a barber's pole">
+      <defs>
+        <linearGradient id="lamp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D4A857" stop-opacity=".35"/><stop offset="1" stop-color="#D4A857" stop-opacity="0"/></linearGradient>
+        <clipPath id="pole"><rect x="318" y="96" width="34" height="190" rx="17"/></clipPath>
+      </defs>
+      <rect width="400" height="500" fill="#1C1A18"/>
+      <rect y="372" width="400" height="128" fill="#24211E"/>
+      <g stroke="#2E2A26" stroke-width="2">
+        <path d="M0 412h400M0 452h400M60 372l-30 128M150 372l-10 128M250 372l10 128M340 372l30 128"/>
+      </g>
+      <path d="M200 0 120 200h160z" fill="url(#lamp)"/>
+      <rect x="196" y="0" width="8" height="34" fill="#3A3631"/>
+      <path d="M176 34h48l-10 18h-28z" fill="#D4A857"/>
+      <rect x="92" y="78" width="176" height="210" rx="88" fill="#26231F" stroke="#D4A857" stroke-width="5"/>
+      <rect x="108" y="94" width="144" height="178" rx="72" fill="#2E2B27"/>
+      <path d="M128 120 170 98M134 150 214 104" stroke="#3E3A34" stroke-width="6" stroke-linecap="round"/>
+      <rect x="70" y="292" width="220" height="12" rx="4" fill="#3A3631"/>
+      <rect x="96" y="276" width="14" height="16" rx="3" fill="#B9B0A3"/>
+      <rect x="118" y="270" width="10" height="22" rx="3" fill="#D4A857"/>
+      <rect x="244" y="280" width="26" height="12" rx="3" fill="#6E665D"/>
+      <rect x="310" y="84" width="50" height="14" rx="7" fill="#D4A857"/>
+      <rect x="310" y="284" width="50" height="14" rx="7" fill="#D4A857"/>
+      <g clip-path="url(#pole)">
+        <rect x="318" y="96" width="34" height="190" fill="#F3EDE2"/>
+        <path d="M290 120l90-60v24l-90 60zM290 168l90-60v24l-90 60zM290 216l90-60v24l-90 60zM290 264l90-60v24l-90 60zM290 312l90-60v24l-90 60z" fill="#C8463C"/>
+      </g>
+      <g fill="#0F0E0D">
+        <rect x="150" y="300" width="96" height="78" rx="18"/>
+        <rect x="130" y="354" width="136" height="34" rx="14"/>
+        <rect x="112" y="340" width="26" height="12" rx="6"/>
+        <rect x="258" y="340" width="26" height="12" rx="6"/>
+        <rect x="190" y="388" width="16" height="44" />
+        <ellipse cx="198" cy="440" rx="58" ry="10"/>
+        <rect x="170" y="400" width="56" height="10" rx="5"/>
+      </g>
+      <rect x="160" y="306" width="76" height="8" rx="4" fill="#D4A857" opacity=".55"/>
+    </svg>
   </section>
 
   <div class="stripe" aria-hidden="true"></div>
@@ -228,7 +262,7 @@ body{padding-bottom:72px}
     <div class="wrap section reveal">
       <h2 id="services-title">Services</h2>
       <ul class="services" data-services></ul>
-      <p class="note">Services and prices to be confirmed by the business.</p>
+      <p class="note">Example prices shown for this concept. Services and prices to be confirmed by the business.</p>
     </div>
   </section>
 
@@ -323,10 +357,11 @@ const CONFIG = {
   ],
   hoursShort: "Mon–Sat 9–7 · Sun 9:30–6",
   services: [
-    { name: "Haircuts",    desc: "Clipper or scissor cuts, shaped to suit you.", price: "[PRICE]" },
-    { name: "Skin Fades",  desc: "Clean fades blended right down to the skin.",  price: "[PRICE]" },
-    { name: "Beard Trims", desc: "Shaping and line-up for a tidy beard.",        price: "[PRICE]" },
-    { name: "Kids' Cuts",  desc: "Patient, tidy cuts for younger clients.",      price: "[PRICE]" }
+    // Example prices for the concept only, not the shop's real prices
+    { name: "Haircuts",    desc: "Clipper or scissor cuts, shaped to suit you.", price: "£15" },
+    { name: "Skin Fades",  desc: "Clean fades blended right down to the skin.",  price: "£18" },
+    { name: "Beard Trims", desc: "Shaping and line-up for a tidy beard.",        price: "£8" },
+    { name: "Kids' Cuts",  desc: "Patient, tidy cuts for younger clients.",      price: "£10" }
   ],
   barbers: ["Bilal", "Sam", "Iby"],
   social: [
