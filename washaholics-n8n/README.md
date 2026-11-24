@@ -57,7 +57,7 @@
 
 ### ۴) نصب workflowها (در Terminal مک)
 ```bash
-git clone https://github.com/zerngton/oso.git
+git clone -b claude/sleepy-cray-g6qx3z https://github.com/zerngton/oso.git
 ```
 ```bash
 cd oso/washaholics-n8n
