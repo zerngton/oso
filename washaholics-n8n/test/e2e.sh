@@ -36,6 +36,10 @@ EOF
 cp config.example.env "$WORK/test.env"
 sed -i.bak 's/^OWNER_EMAIL=.*/OWNER_EMAIL="owner@example.com"/' "$WORK/test.env"
 for k in PLACES_BASE SHEETS_BASE GMAIL_BASE ANTHROPIC_BASE; do echo "$k=\"http://127.0.0.1:$PORT\"" >> "$WORK/test.env"; done
+AI="${AI_ENABLED:-true}"
+sed -i.bak "s/^AI_ENABLED=.*/AI_ENABLED=\"$AI\"/" "$WORK/test.env"
+if [ "$AI" = "true" ]; then D=2; else D=3; fi   # rules also qualify the shopping centre
+echo "== AI_ENABLED=$AI =="
 
 run() { # run <workflowId>
   node build.mjs --config "$WORK/test.env" --creds "$WORK/exported.json" --out "$WORK/dist" >/dev/null
@@ -54,7 +58,7 @@ run washLeadGen00001
 ROWS="st.sheets['$SID'].Leads.slice(1).map(r=>Object.fromEntries(st.sheets['$SID'].Leads[0].map((h,i)=>[h,r[i]])))"
 check "$ROWS.length===5" "5 unique leads saved (duplicate, closed and no-website places dropped)"
 check "$ROWS.find(r=>r.company_name.startsWith('Acme')).email==='facilities@acme-property.test'" "best email picked"
-check "$ROWS.filter(r=>r.status==='Draft Ready'&&r.draft_id&&r.thread_id).length===2" "2 Gmail drafts created"
+check "$ROWS.filter(r=>r.status==='Draft Ready'&&r.draft_id&&r.thread_id).length===$D" "$D Gmail drafts created"
 check "$ROWS.find(r=>r.company_name.startsWith('CleanCo')).status==='Low Fit'" "competitor disqualified"
 check "st.sent.length===0" "no email sent automatically"
 
@@ -66,11 +70,12 @@ curl -s --noproxy '*' -X POST "localhost:$PORT/__control" -H 'content-type: appl
 run washReplies00002
 check "$ROWS.find(r=>r.company_name.startsWith('Acme')).status==='Replied - Interested'" "reply detected and classified"
 check "$ROWS.find(r=>r.company_name.startsWith('The Grand')).status==='Follow-up Draft Ready'" "follow-up draft after FOLLOWUP_DAYS"
-check "Object.keys(st.drafts).length===4" "reply + follow-up drafts created in the threads"
+check "Object.keys(st.drafts).length===$((D+2))" "reply + follow-up drafts created in the threads"
 run washReplies00002
-check "Object.keys(st.drafts).length===4" "re-run creates no duplicate drafts"
+check "Object.keys(st.drafts).length===$((D+2))" "re-run creates no duplicate drafts"
 
 run washReport000003
 check "st.sent.length===1 && /^To: owner@example.com/m.test(st.sent[0])" "daily report emailed to owner only"
 check "st.sheets['$SID'].Reports.length===2" "report row saved"
-echo "All end-to-end checks passed."
+if [ "$AI" = "true" ]; then check "st.calls.some(c=>c.path==='/v1/messages')" "Claude API used"; else check "!st.calls.some(c=>c.path==='/v1/messages')" "no Claude API calls in no-AI mode"; fi
+echo "All end-to-end checks passed (AI_ENABLED=$AI)."

@@ -3,7 +3,7 @@ const prev = $('Build AI Requests').all();
 const leads = $input.all().map((item, i) => {
   const lead = Object.assign({}, prev[i].json);
   delete lead.request;
-  const r = parseClaude(item.json);
+  const r = CONFIG.aiEnabled ? parseClaude(item.json) : { ok: true, data: ruleQualify(lead, CONFIG) };
   lead.date_found = CONFIG.runDate;
   if (!r.ok) {
     lead.status = STATUS.ERROR;
@@ -28,7 +28,7 @@ const leads = $input.all().map((item, i) => {
 });
 
 if (leads.length && leads.every((l) => l.status === STATUS.ERROR)) {
-  throw new Error('Claude API failed for every lead - nothing was saved. First error: ' + leads[0].notes);
+  throw new Error((CONFIG.aiEnabled ? 'Claude API' : 'Scoring') + ' failed for every lead - nothing was saved. First error: ' + leads[0].notes);
 }
 leads.sort((a, b) => (Number(b.relevance_score) || -1) - (Number(a.relevance_score) || -1));
 let qualified = 0;

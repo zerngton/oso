@@ -8,7 +8,8 @@ $input.all().forEach((item, i) => {
   const j = Object.assign({}, prev[i].json);
   delete j.request;
   const upd = Object.assign({}, j.upd);
-  const r = parseClaude(item.json);
+  const r = CONFIG.aiEnabled ? parseClaude(item.json)
+    : (j.action === 'classify_reply' ? { ok: true, data: ruleClassifyReply(j.reply.text) } : { ok: true, data: { followup_body: templateFollowup(j.lead, CONFIG) } });
   if (j.action === 'classify_reply') {
     if (!r.ok) { upd.status = STATUS.REPLIED_OTHER; upd.reply_summary = 'New reply - AI classification failed: ' + r.error; }
     else {

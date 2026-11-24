@@ -217,3 +217,67 @@ function appendRequest(CONFIG, tab, rows) {
 function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+// ---------------------------------------------------------------------------
+// No-AI mode (AI_ENABLED=false): rule-based scoring, template emails and
+// keyword reply classification, so the system runs without a Claude API key.
+// ---------------------------------------------------------------------------
+const SEGMENT_BASE = { property_management: 75, commercial_complex: 70, hotel: 70, restaurant: 62 };
+const HOOKS = [
+  [/car ?park|parking/i, 'car park', 'Pressure washing of car parks and forecourts'],
+  [/terrace|outdoor seating|al fresco|beer garden|courtyard/i, 'outdoor seating area', 'Patio and terrace jet washing'],
+  [/fa[cç]ade|cladding|frontage|shopfront/i, 'building frontage', 'Facade and cladding cleaning'],
+  [/communal|blocks?\b|residential blocks|estates?\b|portfolio/i, 'portfolio of buildings', 'Communal area and bin store cleaning'],
+  [/stores|shops|retail|shopping/i, 'busy retail space', 'Walkway and entrance cleaning, gum removal'],
+  [/rooms|guests|hotel|suites/i, 'guest-facing entrance', 'Entrance, window and signage cleaning'],
+];
+const SEGMENT_LABEL = { property_management: 'property management', commercial_complex: 'commercial site', hotel: 'hotel', restaurant: 'restaurant' };
+
+function ruleQualify(lead, CONFIG) {
+  const text = [lead.company_name, lead.site_text, lead.editorial_summary, lead.place_types].join(' ');
+  const firstWords = String(lead.company_name || '') + ' ' + String(lead.site_text || '').slice(0, 300);
+  if (/clean(ing|ers)|janitorial|pressure wash|window clean/i.test(firstWords)) {
+    return { relevance_score: 5, priority: 'low', segment: lead.segment, fit_reasoning: 'Looks like a cleaning company (competitor).',
+      recommended_services: [], decision_maker_role: '', personalization_hook: '', email_subject: '', email_body: '', disqualify_reason: 'Competitor (cleaning company)' };
+  }
+  let score = SEGMENT_BASE[lead.segment] || 55;
+  const reviews = Number(lead.review_count) || 0;
+  if (reviews >= 1000) score += 10; else if (reviews >= 300) score += 6; else if (reviews >= 100) score += 3; else if (reviews < 15) score -= 10;
+  const hits = HOOKS.filter(([re]) => re.test(text));
+  score += Math.min(hits.length * 4, 12);
+  if (!lead.website_ok) score -= 8;
+  score = Math.max(0, Math.min(100, score));
+  const hook = hits[0] ? hits[0][1] : '';
+  const services = (hits.length ? hits.map((h) => h[2]) : ['Pressure washing', 'Window cleaning']).slice(0, 3);
+  const role = lead.segment === 'restaurant' ? 'General Manager' : lead.segment === 'hotel' ? 'Operations Manager' : 'Facilities Manager';
+  const where = lead.area ? ' in ' + lead.area : '';
+  const kind = SEGMENT_LABEL[lead.segment] || 'business';
+  const subject = 'Exterior cleaning for ' + lead.company_name;
+  const opener = hook ? 'I came across ' + lead.company_name + where + ' and noticed your ' + hook + '.'
+    : 'I came across ' + lead.company_name + where + ' while looking at ' + kind + 's across London.';
+  const body = 'Hello ' + lead.company_name + ' team,\n\n' + opener + ' ' + CONFIG.companyName + ' is a London exterior cleaning company - we help ' + kind + 's keep '
+    + (hook ? 'areas like that' : 'their sites') + ' looking their best with ' + services.slice(0, 2).join(' and ').toLowerCase() + '.\n\n'
+    + 'Would you be open to a free site visit and quote? We work out of hours, so there is no disruption to your ' + (lead.segment === 'restaurant' || lead.segment === 'hotel' ? 'guests' : 'tenants or visitors') + '.\n\n'
+    + "If this isn't relevant, just let me know and I won't get in touch again.";
+  return { relevance_score: score, priority: score >= 80 ? 'high' : score >= 65 ? 'medium' : 'low', segment: lead.segment,
+    fit_reasoning: 'Rule-based: ' + kind + (reviews ? ', ' + reviews + ' Google reviews' : '') + (hits.length ? ', mentions ' + hits.map((h) => h[1]).join(', ') : '') + '.',
+    recommended_services: services, decision_maker_role: role, personalization_hook: hook, email_subject: subject, email_body: body, disqualify_reason: '' };
+}
+
+function ruleClassifyReply(text) {
+  const t = String(text || '').toLowerCase();
+  let category = 'other';
+  if (/unsubscribe|remove me|take me off|do not (contact|email)|don't (contact|email)|stop emailing/.test(t)) category = 'unsubscribe';
+  else if (/out of (the )?office|annual leave|on holiday|away until|automatic reply|auto-?reply|limited access to email/.test(t)) category = 'out_of_office';
+  else if (/not interested|no thanks|no thank you|already have (a|an)|we are covered|not at this time|not required/.test(t)) category = 'not_interested';
+  else if (/\?/.test(t) && !/interested|quote|visit/.test(t)) category = 'question';
+  else if (/interested|quote|pric|cost|call me|give me a call|visit|survey|yes|sounds good|tell me more|availability|available/.test(t)) category = 'interested';
+  const draft = category === 'interested' || category === 'question';
+  return { category, summary: 'Keyword match: ' + category + ' - "' + String(text || '').replace(/\s+/g, ' ').slice(0, 120) + '"',
+    should_draft_reply: draft,
+    reply_body: draft ? 'Thank you for getting back to us. I would be happy to help - could we arrange a quick call or a free site visit this week or next? Let me know a day and time that suits you, and the best number to reach you on.' : '' };
+}
+
+function templateFollowup(lead, CONFIG) {
+  return 'Hello again,\n\nJust following up on my note about exterior cleaning for ' + lead.company_name + '. We are currently booking free site visits across London, and can work out of hours so there is no disruption.\n\nIf now isn\'t a good time, no problem - just let me know.';
+}

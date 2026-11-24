@@ -61,6 +61,7 @@ const CONFIG = {
   followupDays: num('FOLLOWUP_DAYS', 4),
   maxThreadsPerRun: num('MAX_THREADS_PER_RUN', 150),
   timezone: env.TIMEZONE || 'Europe/London',
+  aiEnabled: !/^(false|0|no|off)$/i.test(env.AI_ENABLED || 'true'),
   aiModel: env.AI_MODEL || 'claude-opus-5-5',
   aiEffort: env.AI_EFFORT || 'medium',
   excludeDomains: (env.EXCLUDE_DOMAINS || '').split(',').map((s) => s.trim()).filter(Boolean),
@@ -87,7 +88,7 @@ const missing = new Set();
 function credRef(key) {
   const c = CRED[key];
   const hit = known.find((k) => k.name === c.name && k.type === c.type);
-  if (!hit) missing.add(`${c.name}  (type: ${c.type})`);
+  if (!hit && !(key === 'anthropic' && !CONFIG.aiEnabled)) missing.add(`${c.name}  (type: ${c.type})`);
   return hit ? { id: String(hit.id), name: c.name } : { id: '', name: c.name };
 }
 
@@ -130,6 +131,13 @@ function http(wf, name, pos, { method = 'POST', auth = null, url = '={{ $json.re
   if (insecure) p.options.allowUnauthorizedCerts = true;
   const node = { id: nid(wf), name, type: 'n8n-nodes-base.httpRequest', typeVersion: 4.2, position: pos, parameters: p, onError };
   if (Object.keys(credentials).length) node.credentials = credentials;
+  return node;
+}
+
+// With AI_ENABLED=false the Claude node is disabled: n8n passes items straight
+// through and the next Code node uses rules/templates instead.
+function claudeNode(node) {
+  if (!CONFIG.aiEnabled) { node.disabled = true; node.notes = 'AI_ENABLED=false in config.env - using rules and templates'; node.notesInFlow = true; }
   return node;
 }
 
@@ -204,7 +212,7 @@ function leadgenWf() {
       headers: [['User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36'], ['Accept', 'text/html']] }),
     code(w, 'Extract Emails', 'lead_extract.js', [1980, 100]),
     code(w, 'Build AI Requests', 'lead_build_ai.js', [2200, 100]),
-    http(w, 'Claude: Qualify & Write Email', [2420, 100], { auth: 'anthropic', headers: ANTHROPIC_HEADERS, timeout: 300000, batch: [1, 500] }),
+    claudeNode(http(w, 'Claude: Qualify & Write Email', [2420, 100], { auth: 'anthropic', headers: ANTHROPIC_HEADERS, timeout: 300000, batch: [1, 500] })),
     code(w, 'Parse AI Results', 'lead_parse_ai.js', [2640, 100]),
     code(w, 'Build Draft Requests', 'lead_build_drafts.js', [2860, 100]),
     ifSkip(w, 'No Drafts?', [3080, 100]),
@@ -236,7 +244,7 @@ function repliesWf() {
     code(w, 'Analyze Threads', 'reply_analyze.js', [1100, 100]),
     code(w, 'Build AI Requests', 'reply_build_ai.js', [1320, 100]),
     ifSkip(w, 'Nothing For AI?', [1540, 100]),
-    http(w, 'Claude: Classify / Follow-up', [1760, 200], { auth: 'anthropic', headers: ANTHROPIC_HEADERS, timeout: 300000, batch: [1, 500] }),
+    claudeNode(http(w, 'Claude: Classify / Follow-up', [1760, 200], { auth: 'anthropic', headers: ANTHROPIC_HEADERS, timeout: 300000, batch: [1, 500] })),
     code(w, 'Build Reply Drafts', 'reply_build_drafts.js', [1980, 200]),
     ifSkip(w, 'No Drafts?', [2200, 200]),
     http(w, 'Create Reply Drafts', [2420, 300], { auth: 'gmail', batch: [1, 250] }),
@@ -294,6 +302,7 @@ const workflows = { '00-setup.json': setupWf(), '01-lead-generation.json': leadg
   '03-daily-report.json': reportWf(), '04-error-alerts.json': errorsWf() };
 for (const [file, wf] of Object.entries(workflows)) fs.writeFileSync(path.join(outDir, file), JSON.stringify(wf, null, 2));
 console.log(`Built ${Object.keys(workflows).length} workflows into ${outDir}`);
+console.log(CONFIG.aiEnabled ? `AI mode: ON (${CONFIG.aiModel})` : 'AI mode: OFF (rules + templates, no Claude API key needed)');
 if (CONFIG.sheetId.startsWith('SET_')) console.log('Note: SHEET_ID is not set yet - run "Washaholics 00 - Setup Google Sheet" first.');
 if (credsPath && missing.size) {
   console.log('\nThese credentials were not found in n8n yet (create them with exactly these names):');
