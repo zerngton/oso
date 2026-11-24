@@ -26,13 +26,15 @@ fi
 echo "Using n8n container: $CONTAINER"
 
 TMP=/tmp/washaholics-install
-cleanup() { docker exec "$CONTAINER" rm -rf "$TMP" >/dev/null 2>&1 || true; }
+# docker cp keeps the host's file owner, so clean up and fix permissions as root.
+cleanup() { docker exec -u root "$CONTAINER" rm -rf "$TMP" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 
-docker exec "$CONTAINER" sh -c "rm -rf $TMP && mkdir -p $TMP"
+docker exec -u root "$CONTAINER" sh -c "rm -rf $TMP && mkdir -p $TMP"
 docker cp src "$CONTAINER:$TMP/src" >/dev/null
 docker cp build.mjs "$CONTAINER:$TMP/build.mjs" >/dev/null
 docker cp config.env "$CONTAINER:$TMP/config.env" >/dev/null
+docker exec -u root "$CONTAINER" chmod -R a+rwX "$TMP"
 
 # Read credential IDs by name. Only id/name/type are kept; the export stays
 # encrypted and is deleted immediately.
